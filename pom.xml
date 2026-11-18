@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>warehouse-demo-swt</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>WarehousePro Demo (SWT)</name>
+
+    <!-- Order matters: vaadin-app copies the packaged swt-app jar into its applibs. -->
+    <modules>
+        <module>warehouse-core</module>
+        <module>swt-app</module>
+        <module>vaadin-app</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <hibernate.version>6.4.4.Final</hibernate.version>
+        <h2.version>2.2.224</h2.version>
+        <swt.version>3.135.0</swt.version>
+        <!-- Swing Bridge, for the interop annotations the SWT app uses and the
+             codegen plugin and runtime of the Vaadin app. -->
+        <swing-bridge.version>1.4.0-alpha1</swing-bridge.version>
+        <!-- Set by the OS profiles below; this default is only a fallback. -->
+        <swt.platform>gtk.linux.x86_64</swt.platform>
+        <!-- macOS needs -XstartOnFirstThread; elsewhere a harmless no-op flag. -->
+        <swt.firstThreadArg>-Dswt.firstThread=false</swt.firstThreadArg>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>vaadin-prereleases</id>
+            <url>https://maven.vaadin.com/vaadin-prereleases/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>vaadin-prereleases</id>
+            <url>https://maven.vaadin.com/vaadin-prereleases/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <!-- SWT is a native, per-platform artifact: pick the one for the build machine. -->
+    <profiles>
+        <profile>
+            <id>swt-mac-aarch64</id>
+            <activation>
+                <os><family>mac</family><arch>aarch64</arch></os>
+            </activation>
+            <properties>
+                <swt.platform>cocoa.macosx.aarch64</swt.platform>
+                <swt.firstThreadArg>-XstartOnFirstThread</swt.firstThreadArg>
+            </properties>
+        </profile>
+        <profile>
+            <id>swt-mac-x86_64</id>
+            <activation>
+                <os><family>mac</family><arch>x86_64</arch></os>
+            </activation>
+            <properties>
+                <swt.platform>cocoa.macosx.x86_64</swt.platform>
+                <swt.firstThreadArg>-XstartOnFirstThread</swt.firstThreadArg>
+            </properties>
+        </profile>
+        <profile>
+            <id>swt-linux-x86_64</id>
+            <activation>
+                <os><name>Linux</name><arch>amd64</arch></os>
+            </activation>
+            <properties>
+                <swt.platform>gtk.linux.x86_64</swt.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>swt-linux-aarch64</id>
+            <activation>
+                <os><name>Linux</name><arch>aarch64</arch></os>
+            </activation>
+            <properties>
+                <swt.platform>gtk.linux.aarch64</swt.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>swt-windows</id>
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+            <properties>
+                <swt.platform>win32.win32.x86_64</swt.platform>
+            </properties>
+        </profile>
+        <!-- After swt-windows, so it wins on Windows on ARM (a UTM or
+             Parallels VM on an Apple Silicon Mac). -->
+        <profile>
+            <id>swt-windows-aarch64</id>
+            <activation>
+                <os><family>windows</family><arch>aarch64</arch></os>
+            </activation>
+            <properties>
+                <swt.platform>win32.win32.aarch64</swt.platform>
+            </properties>
+        </profile>
+    </profiles>
+</project>

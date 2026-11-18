@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>warehouse-swt-vaadin-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>WarehousePro in the browser (SWT bridge)</name>
+    <description>Runs on Windows (start-vaadin.bat): every user's SWT application runs in the server's JVM.</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <vaadin.version>25.3.5</vaadin.version>
+        <!-- Keep in step with the root pom. -->
+        <swing-bridge.version>1.4.0-alpha1</swing-bridge.version>
+        <swing-bridge-swt.version>1.0.0-alpha1</swing-bridge-swt.version>
+        <swt.version>3.135.0</swt.version>
+        <!-- For the bridge's runtime; keep in step with the SWT extension. -->
+        <jna.version>5.17.0</jna.version>
+        <!-- The Win32 SWT build for the server's CPU (see the profiles). -->
+        <swt.runtime.platform>win32.win32.x86_64</swt.runtime.platform>
+        <!-- Pin what warehouse-core is built against, over Spring Boot's managed versions. -->
+        <hibernate.version>6.4.4.Final</hibernate.version>
+        <h2.version>2.2.224</h2.version>
+        <swt.bridge.dir>${project.build.directory}/swt-bridge</swt.bridge.dir>
+        <applibs.dir>${project.build.directory}/applibs</applibs.dir>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.vaadin</groupId>
+                <artifactId>vaadin-bom</artifactId>
+                <version>${vaadin.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Vaadin Swing Bridge (licensed separately), and the SWT extension. -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>swing-bridge-flow</artifactId>
+            <version>${swing-bridge.version}</version>
+            <!-- Swing Bridge 1.4 binds SLF4J to Log4j2, which cannot coexist
+                 with Spring Boot's own logging (log4j-to-slf4j); keep Spring
+                 Boot's. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.vaadin.addons.componentfactory</groupId>
+            <artifactId>swing-bridge-swt-flow</artifactId>
+            <version>${swing-bridge-swt.version}</version>
+        </dependency>
+        <!-- The domain model and services, for the host's own views (login,
+             suppliers form, modern dashboard), and the interop types. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>warehouse-core</artifactId>
+            <version>3.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-dev</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.58.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <!-- Vaadin Directory add-ons, for the SWT extension. -->
+        <repository>
+            <id>vaadin-addons</id>
+            <url>https://maven.vaadin.com/vaadin-addons</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>vaadin-prereleases</id>
+            <url>https://maven.vaadin.com/vaadin-prereleases/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>vaadin-prereleases</id>
+            <url>https://maven.vaadin.com/vaadin-prereleases/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!-- The bridge's shared SWT class loader: SWT and JNA.
+                             The bridge's runtime is in the extension's jar. -->
+                        <id>copy-swt-bridge</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy</goal></goals>
+                        <configuration>
+                            <outputDirectory>${swt.bridge.dir}</outputDirectory>
+                            <stripVersion>true</stripVersion>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.eclipse.platform</groupId>
+                                    <artifactId>org.eclipse.swt.${swt.runtime.platform}</artifactId>
+                                    <version>${swt.version}</version>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>net.java.dev.jna</groupId>
+                                    <artifactId>jna</artifactId>
+                                    <version>${jna.version}</version>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!--
+                          The SWT application itself goes to applibs, which
+                          each user's application class loader loads. It is
+                          not a dependency of this module.
+                        -->
+                        <id>copy-swt-app</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>warehouse-swt-app</artifactId>
+                                    <version>3.5.0</version>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${applibs.dir}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!--
+                  Swing Bridge's interop codegen, on the SWT app in applibs:
+                  generates BridgeAppBridge, the typed interface the views call
+                  BridgeApp's @ExposedMethod methods through. Runs right after
+                  the jar is copied there (same phase, declared after it).
+                -->
+                <groupId>com.vaadin</groupId>
+                <artifactId>swing-bridge-codegen-maven-plugin</artifactId>
+                <version>${swing-bridge.version}</version>
+                <configuration>
+                    <applibsDir>${applibs.dir}</applibsDir>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>process-resources</phase>
+                        <goals><goal>generate-bridge</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.vaadin</groupId>
+                <artifactId>vaadin-maven-plugin</artifactId>
+                <version>${vaadin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-frontend</goal>
+                            <goal>build-frontend</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <finalName>app</finalName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Windows on ARM, for example a UTM or Parallels VM on an Apple
+             Silicon Mac. -->
+        <profile>
+            <id>swt-runtime-aarch64</id>
+            <activation><os><arch>aarch64</arch></os></activation>
+            <properties><swt.runtime.platform>win32.win32.aarch64</swt.runtime.platform></properties>
+        </profile>
+        <!-- Playwright ITs, against the running app (start-vaadin.bat). -->
+        <profile>
+            <id>it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
